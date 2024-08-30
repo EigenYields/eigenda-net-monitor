@@ -1,0 +1,119 @@
+{
+  "type": "timeseries",
+  "title": "Batch Rx Throughput",
+  "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 12,
+    "h": 8
+  },
+  "datasource": {
+    "uid": "prometheus",
+    "type": "prometheus"
+  },
+  "id": 20,
+  "targets": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "refId": "A",
+      "expr": "damon_overall_average_speed_MiBps{job=\"dlmon\"}",
+      "range": true,
+      "instant": false,
+      "editorMode": "builder",
+      "legendFormat": "Avg MiB/s",
+      "useBackend": false,
+      "disableTextWrap": false,
+      "fullMetaSearch": false,
+      "includeNullMetadata": true,
+      "exemplar": false
+    },
+    {
+      "refId": "B",
+      "expr": "damon_average_speed_MiBps{job=\"dlmon\"}",
+      "range": true,
+      "instant": false,
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "hide": false,
+      "editorMode": "builder",
+      "legendFormat": "Last MiB/s",
+      "useBackend": false,
+      "disableTextWrap": false,
+      "fullMetaSearch": false,
+      "includeNullMetadata": true
+    }
+  ],
+  "options": {
+    "tooltip": {
+      "mode": "single",
+      "sort": "none",
+      "maxHeight": 600
+    },
+    "legend": {
+      "showLegend": true,
+      "displayMode": "list",
+      "placement": "bottom",
+      "calcs": []
+    }
+  },
+  "fieldConfig": {
+    "defaults": {
+      "custom": {
+        "drawStyle": "line",
+        "lineInterpolation": "linear",
+        "barAlignment": 0,
+        "lineWidth": 1,
+        "fillOpacity": 0,
+        "gradientMode": "none",
+        "spanNulls": false,
+        "insertNulls": false,
+        "showPoints": "auto",
+        "pointSize": 6,
+        "stacking": {
+          "mode": "none",
+          "group": "A"
+        },
+        "axisPlacement": "auto",
+        "axisLabel": "",
+        "axisColorMode": "text",
+        "axisBorderShow": false,
+        "scaleDistribution": {
+          "type": "linear"
+        },
+        "axisCenteredZero": false,
+        "hideFrom": {
+          "tooltip": false,
+          "viz": false,
+          "legend": false
+        },
+        "thresholdsStyle": {
+          "mode": "off"
+        }
+      },
+      "color": {
+        "mode": "palette-classic"
+      },
+      "mappings": [],
+      "thresholds": {
+        "mode": "absolute",
+        "steps": [
+          {
+            "value": null,
+            "color": "green"
+          },
+          {
+            "value": 80,
+            "color": "red"
+          }
+        ]
+      },
+      "decimals": 0
+    },
+    "overrides": []
+  }
+}

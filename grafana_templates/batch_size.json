@@ -1,0 +1,82 @@
+{
+  "datasource": {
+    "uid": "prometheus",
+    "type": "prometheus"
+  },
+  "fieldConfig": {
+    "defaults": {
+      "mappings": [],
+      "thresholds": {
+        "mode": "absolute",
+        "steps": [
+          {
+            "color": "light-red",
+            "value": null
+          },
+          {
+            "color": "semi-dark-green",
+            "value": 800
+          },
+          {
+            "color": "#EAB839",
+            "value": 2000
+          },
+          {
+            "color": "semi-dark-red",
+            "value": 4000
+          }
+        ]
+      },
+      "color": {
+        "mode": "thresholds"
+      },
+      "fieldMinMax": false,
+      "unit": "mbytes"
+    },
+    "overrides": []
+  },
+  "gridPos": {
+    "h": 8,
+    "w": 6,
+    "x": 18,
+    "y": 24
+  },
+  "id": 23,
+  "options": {
+    "reduceOptions": {
+      "values": false,
+      "calcs": [
+        "lastNotNull"
+      ],
+      "fields": ""
+    },
+    "orientation": "auto",
+    "showThresholdLabels": false,
+    "showThresholdMarkers": true,
+    "sizing": "auto",
+    "minVizWidth": 75,
+    "minVizHeight": 75
+  },
+  "pluginVersion": "11.0.0",
+  "targets": [
+    {
+      "refId": "A",
+      "expr": "damon_total_transferred_MiB{job=\"dlmon\"}",
+      "range": true,
+      "instant": false,
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "hide": false,
+      "editorMode": "builder",
+      "legendFormat": "__auto",
+      "useBackend": false,
+      "disableTextWrap": false,
+      "fullMetaSearch": false,
+      "includeNullMetadata": true
+    }
+  ],
+  "title": "Last processed batch size",
+  "type": "gauge"
+}

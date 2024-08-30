@@ -58,6 +58,8 @@ scrape_configs:
       - targets: ['localhost:2112']
 ```
 
+You can also add the Grafana panel json files in grafana_templates to visualise.
+
 ### Example output
 ```bash
 DEBU[2024-08-30T12:48:57Z] Rx bytes detected                             MB/s=207.064692 MiB/s=197.4722785949707 bytes_diff=51766173 size_MiB=49.368069648742676
