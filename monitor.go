@@ -1,0 +1,263 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sirupsen/logrus"
+)
+
+var (
+	batchLatency = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "damon_last_batch_latency",
+			Help: "Time the last batch took to download in seconds.",
+		},
+		[]string{"interface"},
+	)
+
+	overallBatchLatency = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "damon_average_batch_latency",
+			Help: "Average time taken for all batches to download.",
+		},
+		[]string{"interface"},
+	)
+
+	batchTransferredMiB = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "damon_total_transferred_MiB",
+			Help: "Total data transferred in MiB for the current batch.",
+		},
+		[]string{"interface"},
+	)
+	batchAverageSpeedMiBps = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "damon_average_speed_MiBps",
+			Help: "Average download speed in MiB/s for the current batch.",
+		},
+		[]string{"interface"},
+	)
+	overallAverageSpeedMiBps = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "damon_overall_average_speed_MiBps",
+			Help: "Overall average download speed in MiB/s across all batches.",
+		},
+		[]string{"interface"},
+	)
+	overallAverageSpeedMBps = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "damon_overall_average_speed_MBps",
+			Help: "Overall average download speed in MB/s across all batches.",
+		},
+		[]string{"interface"},
+	)
+	batchesObserved = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "damon_batches_observed_total",
+			Help: "Total number of download batches observed.",
+		},
+		[]string{"interface"},
+	)
+	totalDataTransferred = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "damon_overall_data_transferred_MiB",
+			Help: "Total amount of data transferred across all batches in MiB.",
+		},
+		[]string{"interface"},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(batchTransferredMiB)
+	prometheus.MustRegister(batchAverageSpeedMiBps)
+	prometheus.MustRegister(overallAverageSpeedMiBps)
+	prometheus.MustRegister(overallAverageSpeedMBps)
+	prometheus.MustRegister(batchesObserved)
+	prometheus.MustRegister(totalDataTransferred)
+	prometheus.MustRegister(batchLatency)
+	prometheus.MustRegister(overallBatchLatency)
+
+	logrus.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+	})
+	logrus.SetLevel(logrus.InfoLevel)
+}
+
+func main() {
+
+	interfaceName := flag.String("interface", "ens0", "The network interface to monitor")
+	debug := flag.Bool("debug", false, "Enable debug logging")
+
+	flag.Parse()
+
+	if *debug {
+		logrus.SetLevel(logrus.DebugLevel)
+	} else {
+		logrus.SetLevel(logrus.InfoLevel)
+	}
+
+	// Configurable options
+	interval := time.Millisecond * 250
+	logSoftnet := false
+	var minDownloadThreshold = int(1048576 * interval.Seconds()) // 1 MiB/s
+	// Initalize
+	totalBytes := 0
+	totalTransferredMiB := 0.0
+	i := 0
+	totalSpeedMiBps := 0.0
+	totalSpeedMBps := 0.0
+	batchesObservedCount := 0
+	overallBatchMiBps := 0.0
+	overallBatchMBps := 0.0
+	overallAvgLatency := 0.0
+	totalLatencyAllBatches := 0.0
+	downloadStarted := false
+
+	http.Handle("/metrics", promhttp.Handler())
+	go func() {
+		logrus.Fatal(http.ListenAndServe(":2112", nil))
+	}()
+
+	for {
+		rxBytesBefore := getRxBytes(*interfaceName)
+
+		time.Sleep(interval)
+
+		rxBytesAfter := getRxBytes(*interfaceName)
+		rxBytesDiff := rxBytesAfter - rxBytesBefore
+
+		if rxBytesDiff >= minDownloadThreshold {
+			downloadStarted = true
+			totalBytes += rxBytesDiff
+		}
+
+		if downloadStarted {
+			if rxBytesDiff >= minDownloadThreshold {
+				i++
+
+				speedMiBps := float64(rxBytesDiff) / (float64(interval.Seconds()) * 1024 * 1024)
+				speedMBps := float64(rxBytesDiff) / (float64(interval.Seconds()) * 1000000)
+				intervalTransferredMiB := float64(rxBytesDiff) / (1024 * 1024)
+
+				totalSpeedMiBps += speedMiBps
+				totalSpeedMBps += speedMBps
+
+				logrus.WithFields(logrus.Fields{
+					"MiB/s":      speedMiBps,
+					"MB/s":       speedMBps,
+					"size_MiB":   intervalTransferredMiB,
+					"bytes_diff": rxBytesDiff,
+				}).Debug("Rx bytes detected")
+
+			}
+
+			if rxBytesDiff < minDownloadThreshold {
+				averageSpeedMiBpsValue := totalSpeedMiBps / float64(i)
+				averageSpeedMBpsValue := totalSpeedMBps / float64(i)
+
+				finalTransferredMiB := float64(totalBytes) / (1024 * 1024)
+				totalTransferredMiB += finalTransferredMiB
+
+				latency := float64(i) * float64(interval.Seconds())
+				totalLatencyAllBatches += latency
+
+				logrus.WithFields(logrus.Fields{
+					"transferred_MiB": finalTransferredMiB,
+					"latency_secs":    latency,
+					"bytes":           totalBytes,
+					"batch_avg_MiB/s": averageSpeedMiBpsValue,
+					"batch_avg_MB/s":  averageSpeedMBpsValue,
+				}).Info("Batch average")
+
+				batchesObservedCount++
+				overallBatchMiBps = (overallBatchMiBps*float64(batchesObservedCount-1) + averageSpeedMiBpsValue) / float64(batchesObservedCount)
+				overallBatchMBps = (overallBatchMBps*float64(batchesObservedCount-1) + averageSpeedMBpsValue) / float64(batchesObservedCount)
+				overallAvgLatency = (totalLatencyAllBatches) / float64(batchesObservedCount)
+
+				logrus.WithFields(logrus.Fields{
+					"overall_avg_MiB/s":     overallBatchMiBps,
+					"overall_avg_MB/s":      overallBatchMBps,
+					"batches_observed":      batchesObservedCount,
+					"total_MiB_transferred": totalTransferredMiB,
+					"average_latency_secs":  overallAvgLatency,
+				}).Info("Overall Average")
+				// prom update
+				batchTransferredMiB.WithLabelValues(*interfaceName).Set(finalTransferredMiB)
+				batchAverageSpeedMiBps.WithLabelValues(*interfaceName).Set(averageSpeedMiBpsValue)
+				overallAverageSpeedMiBps.WithLabelValues(*interfaceName).Set(overallBatchMiBps)
+				overallAverageSpeedMBps.WithLabelValues(*interfaceName).Set(overallBatchMBps)
+				batchesObserved.WithLabelValues(*interfaceName).Set(float64(batchesObservedCount))
+				totalDataTransferred.WithLabelValues(*interfaceName).Set(totalTransferredMiB)
+				batchLatency.WithLabelValues(*interfaceName).Set(latency)
+				overallBatchLatency.WithLabelValues(*interfaceName).Set(overallAvgLatency)
+
+				// Log softnet stats if enabled
+				if logSoftnet {
+					softnetStats := getSoftnetStats()
+					logrus.Debug(softnetStats)
+				}
+
+				downloadStarted = false
+				totalBytes = 0
+				i = 0
+				totalSpeedMiBps = 0
+				totalSpeedMBps = 0
+			}
+		} else {
+			if rxBytesDiff < minDownloadThreshold {
+				totalBytes = 0
+			}
+		}
+	}
+}
+
+func getRxBytes(interfaceName string) int {
+	data, err := os.ReadFile(fmt.Sprintf("/sys/class/net/%s/statistics/rx_bytes", interfaceName))
+	if err != nil {
+		logrus.Fatalf("Failed to read rx_bytes: %v", err)
+	}
+	rxBytes, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		logrus.Fatalf("Failed to convert rx_bytes to int: %v", err)
+	}
+	return rxBytes
+}
+
+func getSoftnetStats() string {
+	data, err := os.ReadFile("/proc/net/softnet_stat")
+	if err != nil {
+		logrus.Fatalf("Failed to read softnet_stat: %v", err)
+	}
+	lines := strings.Split(string(data), "\n")
+	result := ""
+	for i, line := range lines {
+		if len(line) > 0 {
+			fields := strings.Fields(line)
+			dropped := hexToDec(fields[1])
+			squeezed := hexToDec(fields[2])
+			collision := hexToDec(fields[3])
+			rps := hexToDec(fields[4])
+			ipi := hexToDec(fields[5])
+			queued := hexToDec(fields[6])
+			rpsFail := hexToDec(fields[7])
+			result += fmt.Sprintf("CPU%d: dropped=%d squeezed=%d collision=%d rps=%d ipi=%d queued=%d rps_fail=%d\n", i, dropped, squeezed, collision, rps, ipi, queued, rpsFail)
+		}
+	}
+	return result
+}
+
+func hexToDec(hexStr string) int {
+	result, err := strconv.ParseInt(hexStr, 16, 64)
+	if err != nil {
+		logrus.Fatalf("Failed to convert hex to int: %v", err)
+	}
+	return int(result)
+}
