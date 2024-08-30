@@ -2,6 +2,9 @@
 
 `eigenda-net-monitor` is a small go app to help monitor EigenDA batch end to end latency and download speed from the disperser. 
 
+<img width="1228" alt="image" src="https://github.com/user-attachments/assets/2add7c91-6ca4-405e-aeaa-2d641bc73352">
+
+
 ## What it does
 
 It simply monitors the `rx_bytes` from the network interface on your EigenDA instance, if recieved bytes are less than < 1 MiB/s, it does nothing. If the rate if received bytes increases above 1 MiB/s we assume a batch has started being downloaded from the disperser and wait for it to finish to calculate metrics. Therefore, if your instance downloads any other file it will assume it is a batch. You may need to tweak the threshold if batches are being double counted, but these setting work well for us.
