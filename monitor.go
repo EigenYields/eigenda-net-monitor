@@ -166,11 +166,11 @@ func main() {
 			latency := time.Since(start).Seconds()
 			totalLatencyAllBatches += latency
 
-			averageSpeedMiBpsValue := totalSpeedMiBps / float64(batchesObservedCount+1)
-			averageSpeedMBpsValue := totalSpeedMBps / float64(batchesObservedCount+1)
-
 			finalTransferredMiB := float64(totalBytes) / (1024 * 1024)
 			totalTransferredMiB += finalTransferredMiB
+
+			averageSpeedMiBpsValue := finalTransferredMiB / latency
+			averageSpeedMBpsValue := (finalTransferredMiB * 1024 * 1024) / (latency * 1000000)
 
 			logrus.WithFields(logrus.Fields{
 				"transferred_MiB": finalTransferredMiB,
