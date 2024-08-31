@@ -123,7 +123,7 @@ func main() {
 
 	http.Handle("/metrics", promhttp.Handler())
 	go func() {
-		logrus.Info(fmt.Printf("Prometheus metrics server started on port %s", *promPort))
+		logrus.Info(fmt.Sprintf("Prometheus metrics server started on port %s", *promPort))
 		logrus.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", *promPort), nil))
 	}()
 
@@ -145,6 +145,8 @@ func main() {
 			totalBytes += rxBytesDiff
 
 			elapsed := time.Since(start).Seconds()
+
+			fmt.Printf("elapsed %s\n", elapsed)
 
 			speedMiBps := (float64(rxBytesDiff) / 1024 / 1024) / elapsed // Convert bytes to MiB, then divide by elapsed time
 			speedMBps := (float64(rxBytesDiff) / 1000000) / elapsed      // Convert bytes to MB, then divide by elapsed time
