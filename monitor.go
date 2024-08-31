@@ -111,7 +111,6 @@ func main() {
 	// Initalize
 	totalBytes := 0
 	totalTransferredMiB := 0.0
-	i := 0
 	totalSpeedMiBps := 0.0
 	totalSpeedMBps := 0.0
 	batchesObservedCount := 0
@@ -126,96 +125,93 @@ func main() {
 		logrus.Fatal(http.ListenAndServe(":2112", nil))
 	}()
 
-	for {
-		rxBytesBefore := getRxBytes(*interfaceName)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
-		time.Sleep(interval)
+	rxBytesBefore := getRxBytes(*interfaceName) // Initialize before the loop
+	var start time.Time
 
-		rxBytesAfter := getRxBytes(*interfaceName)
+	for range ticker.C {
+		rxBytesAfter := getRxBytes(*interfaceName) // Measure after the interval
 		rxBytesDiff := rxBytesAfter - rxBytesBefore
 
 		if rxBytesDiff >= minDownloadThreshold {
-			downloadStarted = true
+			if !downloadStarted {
+				start = time.Now()
+				downloadStarted = true
+			}
 			totalBytes += rxBytesDiff
+
+			speedMiBps := float64(rxBytesDiff) / (float64(interval.Seconds()) * 1024 * 1024)
+			speedMBps := float64(rxBytesDiff) / (float64(interval.Seconds()) * 1000000)
+			intervalTransferredMiB := float64(rxBytesDiff) / (1024 * 1024)
+
+			totalSpeedMiBps += speedMiBps
+			totalSpeedMBps += speedMBps
+
+			logrus.WithFields(logrus.Fields{
+				"MiB/s":      speedMiBps,
+				"MB/s":       speedMBps,
+				"size_MiB":   intervalTransferredMiB,
+				"bytes_diff": rxBytesDiff,
+			}).Debug("Rx bytes detected")
 		}
 
-		if downloadStarted {
-			if rxBytesDiff >= minDownloadThreshold {
-				i++
+		if downloadStarted && rxBytesDiff < minDownloadThreshold {
+			latency := time.Since(start).Seconds()
+			totalLatencyAllBatches += latency
 
-				speedMiBps := float64(rxBytesDiff) / (float64(interval.Seconds()) * 1024 * 1024)
-				speedMBps := float64(rxBytesDiff) / (float64(interval.Seconds()) * 1000000)
-				intervalTransferredMiB := float64(rxBytesDiff) / (1024 * 1024)
+			averageSpeedMiBpsValue := totalSpeedMiBps / float64(batchesObservedCount+1)
+			averageSpeedMBpsValue := totalSpeedMBps / float64(batchesObservedCount+1)
 
-				totalSpeedMiBps += speedMiBps
-				totalSpeedMBps += speedMBps
+			finalTransferredMiB := float64(totalBytes) / (1024 * 1024)
+			totalTransferredMiB += finalTransferredMiB
 
-				logrus.WithFields(logrus.Fields{
-					"MiB/s":      speedMiBps,
-					"MB/s":       speedMBps,
-					"size_MiB":   intervalTransferredMiB,
-					"bytes_diff": rxBytesDiff,
-				}).Debug("Rx bytes detected")
+			logrus.WithFields(logrus.Fields{
+				"transferred_MiB": finalTransferredMiB,
+				"latency_secs":    latency,
+				"bytes":           totalBytes,
+				"batch_avg_MiB/s": averageSpeedMiBpsValue,
+				"batch_avg_MB/s":  averageSpeedMBpsValue,
+			}).Info("Batch average")
 
+			batchesObservedCount++
+			overallBatchMiBps = (overallBatchMiBps*float64(batchesObservedCount-1) + averageSpeedMiBpsValue) / float64(batchesObservedCount)
+			overallBatchMBps = (overallBatchMBps*float64(batchesObservedCount-1) + averageSpeedMBpsValue) / float64(batchesObservedCount)
+			overallAvgLatency = totalLatencyAllBatches / float64(batchesObservedCount)
+
+			logrus.WithFields(logrus.Fields{
+				"overall_avg_MiB/s":     overallBatchMiBps,
+				"overall_avg_MB/s":      overallBatchMBps,
+				"batches_observed":      batchesObservedCount,
+				"total_MiB_transferred": totalTransferredMiB,
+				"average_latency_secs":  overallAvgLatency,
+			}).Info("Overall Average")
+
+			// Prometheus metrics update
+			batchTransferredMiB.WithLabelValues(*interfaceName).Set(finalTransferredMiB)
+			batchAverageSpeedMiBps.WithLabelValues(*interfaceName).Set(averageSpeedMiBpsValue)
+			overallAverageSpeedMiBps.WithLabelValues(*interfaceName).Set(overallBatchMiBps)
+			overallAverageSpeedMBps.WithLabelValues(*interfaceName).Set(overallBatchMBps)
+			batchesObserved.WithLabelValues(*interfaceName).Set(float64(batchesObservedCount))
+			totalDataTransferred.WithLabelValues(*interfaceName).Set(totalTransferredMiB)
+			batchLatency.WithLabelValues(*interfaceName).Set(latency)
+			overallBatchLatency.WithLabelValues(*interfaceName).Set(overallAvgLatency)
+
+			// Log softnet stats if enabled
+			if logSoftnet {
+				softnetStats := getSoftnetStats()
+				logrus.Debug(softnetStats)
 			}
 
-			if rxBytesDiff < minDownloadThreshold {
-				averageSpeedMiBpsValue := totalSpeedMiBps / float64(i)
-				averageSpeedMBpsValue := totalSpeedMBps / float64(i)
-
-				finalTransferredMiB := float64(totalBytes) / (1024 * 1024)
-				totalTransferredMiB += finalTransferredMiB
-
-				latency := float64(i) * float64(interval.Seconds())
-				totalLatencyAllBatches += latency
-
-				logrus.WithFields(logrus.Fields{
-					"transferred_MiB": finalTransferredMiB,
-					"latency_secs":    latency,
-					"bytes":           totalBytes,
-					"batch_avg_MiB/s": averageSpeedMiBpsValue,
-					"batch_avg_MB/s":  averageSpeedMBpsValue,
-				}).Info("Batch average")
-
-				batchesObservedCount++
-				overallBatchMiBps = (overallBatchMiBps*float64(batchesObservedCount-1) + averageSpeedMiBpsValue) / float64(batchesObservedCount)
-				overallBatchMBps = (overallBatchMBps*float64(batchesObservedCount-1) + averageSpeedMBpsValue) / float64(batchesObservedCount)
-				overallAvgLatency = (totalLatencyAllBatches) / float64(batchesObservedCount)
-
-				logrus.WithFields(logrus.Fields{
-					"overall_avg_MiB/s":     overallBatchMiBps,
-					"overall_avg_MB/s":      overallBatchMBps,
-					"batches_observed":      batchesObservedCount,
-					"total_MiB_transferred": totalTransferredMiB,
-					"average_latency_secs":  overallAvgLatency,
-				}).Info("Overall Average")
-				// prom update
-				batchTransferredMiB.WithLabelValues(*interfaceName).Set(finalTransferredMiB)
-				batchAverageSpeedMiBps.WithLabelValues(*interfaceName).Set(averageSpeedMiBpsValue)
-				overallAverageSpeedMiBps.WithLabelValues(*interfaceName).Set(overallBatchMiBps)
-				overallAverageSpeedMBps.WithLabelValues(*interfaceName).Set(overallBatchMBps)
-				batchesObserved.WithLabelValues(*interfaceName).Set(float64(batchesObservedCount))
-				totalDataTransferred.WithLabelValues(*interfaceName).Set(totalTransferredMiB)
-				batchLatency.WithLabelValues(*interfaceName).Set(latency)
-				overallBatchLatency.WithLabelValues(*interfaceName).Set(overallAvgLatency)
-
-				// Log softnet stats if enabled
-				if logSoftnet {
-					softnetStats := getSoftnetStats()
-					logrus.Debug(softnetStats)
-				}
-
-				downloadStarted = false
-				totalBytes = 0
-				i = 0
-				totalSpeedMiBps = 0
-				totalSpeedMBps = 0
-			}
-		} else {
-			if rxBytesDiff < minDownloadThreshold {
-				totalBytes = 0
-			}
+			// Reset for next batch
+			downloadStarted = false
+			totalBytes = 0
+			totalSpeedMiBps = 0
+			totalSpeedMBps = 0
 		}
+
+		rxBytesBefore = rxBytesAfter
 	}
 }
 
