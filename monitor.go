@@ -146,7 +146,7 @@ func main() {
 
 			elapsed := time.Since(start).Seconds()
 
-			fmt.Printf("elapsed %s\n", elapsed)
+			fmt.Printf("elapsed %d\n", elapsed)
 
 			speedMiBps := (float64(rxBytesDiff) / 1024 / 1024) / elapsed // Convert bytes to MiB, then divide by elapsed time
 			speedMBps := (float64(rxBytesDiff) / 1000000) / elapsed      // Convert bytes to MB, then divide by elapsed time
