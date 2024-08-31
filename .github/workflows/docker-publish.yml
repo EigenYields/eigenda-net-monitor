@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,13 +37,13 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/eigenyields/eigenda-net-monitor:${{ env.VERSION }}
-            ghcr.io/eigenyields/eigenda-net-monitor:latest
+            eigenyields/eigenda-net-monitor:${{ env.VERSION }}
+            eigenyields/eigenda-net-monitor:latest
 
       - name: Log out of GitHub Container Registry
         run: docker logout ghcr.io
