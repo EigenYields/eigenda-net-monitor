@@ -141,6 +141,7 @@ func main() {
 			if !downloadStarted {
 				start = time.Now()
 				downloadStarted = true
+				totalBytes = 0
 			}
 			totalBytes += rxBytesDiff
 
@@ -169,8 +170,12 @@ func main() {
 			finalTransferredMiB := float64(totalBytes) / (1024 * 1024)
 			totalTransferredMiB += finalTransferredMiB
 
+			fmt.Printf("Transferred MiB: %f, Latency Secs: %f, Expected MiB/s: %f\n", finalTransferredMiB, latency, finalTransferredMiB/latency)
+
 			averageSpeedMiBpsValue := finalTransferredMiB / latency
 			averageSpeedMBpsValue := (finalTransferredMiB * 1024 * 1024) / (latency * 1000000)
+
+			fmt.Printf("Transferred MiB: %f, Latency Secs: %f, Expected MiB/s: %f\n", finalTransferredMiB, latency, finalTransferredMiB/latency)
 
 			logrus.WithFields(logrus.Fields{
 				"transferred_MiB": finalTransferredMiB,
