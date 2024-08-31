@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  damon:
+    image: ghcr.io/eigenyields/eigenda-net-monitor:latest
+    build: .
+    container_name: eigenda-network-monitor
+    ports:
+      - "2112:2112"
+    restart: unless-stopped
+    command:
+      [
+        "./main",
+        "--interface",
+        "ens5", # Specify interface
+        "--debug",
+        "false"
+      ]
