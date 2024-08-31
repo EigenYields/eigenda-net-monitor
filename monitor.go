@@ -146,10 +146,8 @@ func main() {
 
 			elapsed := time.Since(start).Seconds()
 
-			fmt.Printf("elapsed %d\n", elapsed)
-
-			speedMiBps := (float64(rxBytesDiff) / 1024 / 1024) / elapsed // Convert bytes to MiB, then divide by elapsed time
-			speedMBps := (float64(rxBytesDiff) / 1000000) / elapsed      // Convert bytes to MB, then divide by elapsed time
+			speedMiBps := float64(rxBytesDiff) / (float64(interval.Seconds()) * 1024 * 1024)
+			speedMBps := float64(rxBytesDiff) / (float64(interval.Seconds()) * 1000000)
 			intervalTransferredMiB := float64(rxBytesDiff) / (1024 * 1024)
 
 			totalSpeedMiBps += speedMiBps
@@ -160,6 +158,7 @@ func main() {
 				"MB/s":       speedMBps,
 				"size_MiB":   intervalTransferredMiB,
 				"bytes_diff": rxBytesDiff,
+				"elapsed":    elapsed,
 			}).Debug("Rx bytes detected")
 		}
 
