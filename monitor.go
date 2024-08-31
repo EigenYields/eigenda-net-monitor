@@ -142,8 +142,10 @@ func main() {
 			}
 			totalBytes += rxBytesDiff
 
-			speedMiBps := float64(rxBytesDiff) / (float64(interval.Seconds()) * 1024 * 1024)
-			speedMBps := float64(rxBytesDiff) / (float64(interval.Seconds()) * 1000000)
+			elapsed := time.Since(start).Seconds()
+
+			speedMiBps := float64(rxBytesDiff) / elapsed * 1024 * 1024
+			speedMBps := float64(rxBytesDiff) / elapsed * 1000000
 			intervalTransferredMiB := float64(rxBytesDiff) / (1024 * 1024)
 
 			totalSpeedMiBps += speedMiBps
