@@ -42,8 +42,8 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            eigenyields/eigenda-net-monitor:${{ env.VERSION }}
-            eigenyields/eigenda-net-monitor:latest
+            EigenYields/eigenda-net-monitor:${{ env.VERSION }}
+            EigenYields/eigenda-net-monitor:latest
 
       - name: Log out of GitHub Container Registry
         run: docker logout ghcr.io
