@@ -94,7 +94,9 @@ func init() {
 func main() {
 
 	interfaceName := flag.String("interface", "ens0", "The network interface to monitor")
+	promPort := flag.String("port", "2112", "Prometheus metrics server port")
 	debug := flag.Bool("debug", false, "Enable debug logging")
+	softNet := flag.Bool("softnet", false, "Log softnet stats")
 
 	flag.Parse()
 
@@ -106,7 +108,6 @@ func main() {
 
 	// Configurable options
 	interval := time.Millisecond * 250
-	logSoftnet := false
 	var minDownloadThreshold = int(1048576 * interval.Seconds()) // 1 MiB/s
 	// Initalize
 	totalBytes := 0
@@ -122,7 +123,8 @@ func main() {
 
 	http.Handle("/metrics", promhttp.Handler())
 	go func() {
-		logrus.Fatal(http.ListenAndServe(":2112", nil))
+		logrus.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", *promPort), nil))
+		logrus.Info(fmt.Printf("Prometheus metrics server started on port %s", *promPort))
 	}()
 
 	ticker := time.NewTicker(interval)
@@ -201,7 +203,7 @@ func main() {
 			overallBatchLatency.WithLabelValues(*interfaceName).Set(overallAvgLatency)
 
 			// Log softnet stats if enabled
-			if logSoftnet {
+			if *softNet {
 				softnetStats := getSoftnetStats()
 				logrus.Debug(softnetStats)
 			}
