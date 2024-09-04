@@ -1,64 +1,7 @@
 {
-  "type": "timeseries",
-  "title": "Rx Latency (s)",
-  "gridPos": {
-    "x": 0,
-    "y": 8,
-    "w": 12,
-    "h": 8
-  },
   "datasource": {
     "uid": "prometheus",
     "type": "prometheus"
-  },
-  "id": 21,
-  "targets": [
-    {
-      "refId": "A",
-      "expr": "damon_last_batch_latency{job=\"dlmon\"}",
-      "range": true,
-      "instant": false,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "editorMode": "builder",
-      "legendFormat": "Last Batch",
-      "useBackend": false,
-      "disableTextWrap": false,
-      "fullMetaSearch": false,
-      "includeNullMetadata": true
-    },
-    {
-      "refId": "B",
-      "expr": "damon_average_batch_latency",
-      "range": true,
-      "instant": false,
-      "datasource": {
-        "uid": "prometheus",
-        "type": "prometheus"
-      },
-      "hide": false,
-      "editorMode": "builder",
-      "legendFormat": "Average ",
-      "useBackend": false,
-      "disableTextWrap": false,
-      "fullMetaSearch": false,
-      "includeNullMetadata": true
-    }
-  ],
-  "options": {
-    "tooltip": {
-      "mode": "single",
-      "sort": "none",
-      "maxHeight": 600
-    },
-    "legend": {
-      "showLegend": true,
-      "displayMode": "list",
-      "placement": "bottom",
-      "calcs": []
-    }
   },
   "fieldConfig": {
     "defaults": {
@@ -69,7 +12,7 @@
         "lineWidth": 1,
         "fillOpacity": 0,
         "gradientMode": "none",
-        "spanNulls": false,
+        "spanNulls": 3600000,
         "insertNulls": false,
         "showPoints": "auto",
         "pointSize": 5,
@@ -102,17 +45,113 @@
         "mode": "absolute",
         "steps": [
           {
-            "value": null,
-            "color": "green"
+            "color": "green",
+            "value": null
           },
           {
-            "value": 80,
-            "color": "red"
+            "color": "red",
+            "value": 80
           }
         ]
       }
     },
     "overrides": []
   },
+  "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 8
+  },
+  "id": 21,
+  "options": {
+    "tooltip": {
+      "mode": "single",
+      "sort": "none",
+      "maxHeight": 600
+    },
+    "legend": {
+      "showLegend": true,
+      "displayMode": "list",
+      "placement": "bottom",
+      "calcs": []
+    }
+  },
+  "targets": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "disableTextWrap": false,
+      "editorMode": "builder",
+      "expr": "damon_last_batch_latency{job=\"dlmon\"}",
+      "fullMetaSearch": false,
+      "includeNullMetadata": true,
+      "instant": false,
+      "legendFormat": "Last Batch",
+      "range": true,
+      "refId": "A",
+      "useBackend": false
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "disableTextWrap": false,
+      "editorMode": "builder",
+      "expr": "damon_average_batch_latency",
+      "fullMetaSearch": false,
+      "hide": false,
+      "includeNullMetadata": true,
+      "instant": false,
+      "legendFormat": "Average ",
+      "range": true,
+      "refId": "B",
+      "useBackend": false
+    },
+    {
+      "refId": "C",
+      "expr": "damon_rolling_average_batch_latency{window=\"10\"}",
+      "range": true,
+      "instant": false,
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "hide": false,
+      "editorMode": "code",
+      "legendFormat": "Last 10"
+    },
+    {
+      "refId": "D",
+      "expr": "damon_rolling_average_batch_latency{window=\"100\"}",
+      "range": true,
+      "instant": false,
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "hide": false,
+      "editorMode": "code",
+      "legendFormat": "Last 100"
+    },
+    {
+      "refId": "E",
+      "expr": "damon_rolling_average_batch_latency{window=\"1000\"}",
+      "range": true,
+      "instant": false,
+      "datasource": {
+        "uid": "prometheus",
+        "type": "prometheus"
+      },
+      "hide": false,
+      "editorMode": "code",
+      "legendFormat": "Last 1000"
+    }
+  ],
+  "title": "Rx Latency (s)",
+  "type": "timeseries",
   "description": ""
 }
