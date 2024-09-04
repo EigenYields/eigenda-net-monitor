@@ -73,7 +73,40 @@ var (
 		},
 		[]string{"interface"},
 	)
+
+	rollingAverageBatchLatency = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "damon_rolling_average_batch_latency",
+			Help: "Rolling average of batch latency for the last N batches.",
+		},
+		[]string{"interface", "window"},
+	)
+
+	rollingAverageSpeedMiBps = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "damon_rolling_average_speed_MiBps",
+			Help: "Rolling average of download speed in MiB/s for the last N batches.",
+		},
+		[]string{"interface", "window"},
+	)
+
+	rollingAverageSpeedMBps = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "damon_rolling_average_speed_MBps",
+			Help: "Rolling average of download speed in MB/s for the last N batches.",
+		},
+		[]string{"interface", "window"},
+	)
 )
+
+type RollingStats struct {
+	window    int
+	latencies []float64
+	speedsMiB []float64
+	speedsMB  []float64
+	index     int
+	count     int
+}
 
 func init() {
 	prometheus.MustRegister(batchTransferredMiB)
@@ -84,6 +117,9 @@ func init() {
 	prometheus.MustRegister(totalDataTransferred)
 	prometheus.MustRegister(batchLatency)
 	prometheus.MustRegister(overallBatchLatency)
+	prometheus.MustRegister(rollingAverageBatchLatency)
+	prometheus.MustRegister(rollingAverageSpeedMiBps)
+	prometheus.MustRegister(rollingAverageSpeedMBps)
 
 	logrus.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp: true,
@@ -132,6 +168,12 @@ func main() {
 
 	rxBytesBefore := getRxBytes(*interfaceName) // Initialize before the loop
 	var start time.Time
+
+	rollingWindows := []int{10, 100, 1000}
+	rollingStats := make(map[int]*RollingStats)
+	for _, window := range rollingWindows {
+		rollingStats[window] = NewRollingStats(window)
+	}
 
 	for range ticker.C {
 		rxBytesAfter := getRxBytes(*interfaceName) // Measure after the interval
@@ -193,6 +235,7 @@ func main() {
 				"total_MiB_transferred": totalTransferredMiB,
 				"average_latency_secs":  overallAvgLatency,
 			}).Info("Overall Average")
+			
 
 			// Prometheus metrics update
 			batchTransferredMiB.WithLabelValues(*interfaceName).Set(finalTransferredMiB)
@@ -203,6 +246,12 @@ func main() {
 			totalDataTransferred.WithLabelValues(*interfaceName).Set(totalTransferredMiB)
 			batchLatency.WithLabelValues(*interfaceName).Set(latency)
 			overallBatchLatency.WithLabelValues(*interfaceName).Set(overallAvgLatency)
+
+			// Update rolling averages
+			for window, stats := range rollingStats {
+				stats.Add(latency, averageSpeedMiBpsValue, averageSpeedMBpsValue)
+				updateRollingMetrics(*interfaceName, window, stats)
+			}
 
 			// Log softnet stats if enabled
 			if *softNet {
@@ -262,4 +311,48 @@ func hexToDec(hexStr string) int {
 		logrus.Fatalf("Failed to convert hex to int: %v", err)
 	}
 	return int(result)
+}
+
+
+
+func NewRollingStats(window int) *RollingStats {
+	return &RollingStats{
+		window:    window,
+		latencies: make([]float64, window),
+		speedsMiB: make([]float64, window),
+		speedsMB:  make([]float64, window),
+	}
+}
+
+func (rs *RollingStats) Add(latency, speedMiB, speedMB float64) {
+	rs.latencies[rs.index] = latency
+	rs.speedsMiB[rs.index] = speedMiB
+	rs.speedsMB[rs.index] = speedMB
+	rs.index = (rs.index + 1) % rs.window
+	if rs.count < rs.window {
+		rs.count++
+	}
+}
+
+func (rs *RollingStats) Average() (avgLatency, avgSpeedMiB, avgSpeedMB float64) {
+	if rs.count == 0 {
+		return 0, 0, 0
+	}
+	for i := 0; i < rs.count; i++ {
+		avgLatency += rs.latencies[i]
+		avgSpeedMiB += rs.speedsMiB[i]
+		avgSpeedMB += rs.speedsMB[i]
+	}
+	avgLatency /= float64(rs.count)
+	avgSpeedMiB /= float64(rs.count)
+	avgSpeedMB /= float64(rs.count)
+	return
+}
+
+func updateRollingMetrics(interfaceName string, window int, stats *RollingStats) {
+	avgLatency, avgSpeedMiB, avgSpeedMB := stats.Average()
+	windowStr := strconv.Itoa(window)
+	rollingAverageBatchLatency.WithLabelValues(interfaceName, windowStr).Set(avgLatency)
+	rollingAverageSpeedMiBps.WithLabelValues(interfaceName, windowStr).Set(avgSpeedMiB)
+	rollingAverageSpeedMBps.WithLabelValues(interfaceName, windowStr).Set(avgSpeedMB)
 }
